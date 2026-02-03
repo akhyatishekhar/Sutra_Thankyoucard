@@ -7,8 +7,13 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
     <!-- Fonts -->
+    <!-- Samarkan for the Logo -->
+    <link href="https://fonts.cdnfonts.com/css/samarkan" rel="stylesheet">
+    <!-- Google Fonts for other elements -->
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Poppins:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,600;1,600&family=Great+Vibes&family=Oswald:wght@500;700&family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet">
+    
     <style>
         /* Base Styles */
         body {
@@ -34,7 +39,12 @@
         }
         
         /* Font Utilities */
-        .font-sutra { font-family: 'Nunito', sans-serif; }
+        /* UPDATED: Strict controls to prevent fake italics */
+        .font-sutra { 
+            font-family: 'Samarkan', sans-serif; 
+            font-style: normal !important;
+            font-synthesis: none !important; 
+        }
         .font-playfair { font-family: 'Playfair Display', serif; }
         .font-script { font-family: 'Great Vibes', cursive; }
         .font-bold-display { font-family: 'Oswald', sans-serif; }
@@ -253,7 +263,11 @@
                             </div>
 
                             <div class="text-[10px] text-gray-700 space-y-0.5 leading-tight">
-                                <h3 id="footerBrand" class="text-2xl font-bold mb-1 font-sutra">a sutra <span class="text-lg font-normal text-gray-600">एक सूत्र</span></h3>
+                                <!-- UPDATED: Using inline-block span with skewX transformation to force upright appearance -->
+                                <h3 id="footerBrand" class="text-4xl mb-1 font-sutra lowercase not-italic text-blue-900">
+                                    <span class="inline-block" style="transform: skewX(15deg); transform-origin: bottom left;">a sutra</span> 
+                                    <span class="text-lg font-sans text-gray-600 font-normal">एक सूत्र</span>
+                                </h3>
                                 <p class="font-bold text-gray-800">(A Societal for Urban, Tribal & Rural Advancement)</p>
                                 <p>West Bengal Act. XXVI of 1961 : SO171363 of 2010-2011</p>
                                 <p>NGO Darpan ID : WB/2022/0318362</p>
@@ -337,7 +351,18 @@
             controls.downloadBtn.className = `text-white px-3 py-3 rounded-lg transition shadow flex items-center justify-center gap-2 font-medium text-sm ${colors.button}`;
             const footerBrand = document.getElementById('footerBrand');
             const footerReg = document.getElementById('footerReg');
-            if(footerBrand) footerBrand.className = `text-2xl font-bold mb-1 font-sutra ${colors.primary.replace('text-', 'text-opacity-80 text-')}`;
+            
+            // UPDATED: Re-applying the HTML structure with skew transform inside the JS render if needed, though static HTML handles footer
+            // But we need to ensure colors are updated.
+            // The footerBrand HTML is static in the body, so we only update classes here.
+            if(footerBrand) {
+                // Ensure we keep the inner structure while updating color class
+                // We are only changing the text color class, which is at the end of className string usually
+                // But simplified: Just set the class name and ensure innerHTML is correct or styled.
+                // Actually footerBrand has static innerHTML in the body. We just need to update the color class on the parent H3.
+                // The H3 class list: text-4xl mb-1 font-sutra lowercase not-italic text-blue-900 (or other color)
+                footerBrand.className = `text-4xl mb-1 font-sutra lowercase not-italic ${colors.primary}`;
+            }
             if(footerReg) footerReg.className = `font-semibold ${colors.primary}`;
 
             // Toggle Field Visibility
@@ -382,7 +407,8 @@
                         
                         <div class="mb-8 mt-6">
                             <div class="name-sticker">
-                                <span class="text-3xl font-bold text-gray-900 font-sutra">${data.title} ${data.name}</span>
+                                <!-- UPDATED: Used font-sans for recipient name (normal sans serif, normal weight) -->
+                                <span class="text-3xl text-gray-900 font-sans">${data.title} ${data.name}</span>
                             </div>
                         </div>
 
@@ -411,7 +437,7 @@
                         ${greetingHTML.replace('text-center', 'text-left')}
                         
                         <p class="text-2xl text-gray-600 mt-4 max-w-lg">
-                            We are deeply grateful to <span class="font-bold text-gray-900 border-b-2 border-gray-200">${data.title} ${data.name}</span> for supporting our cause.
+                            We are deeply grateful to <span class="font-bold text-gray-900 border-b-2 border-gray-200 font-sans">${data.title} ${data.name}</span> for supporting our cause.
                         </p>
                     </div>
 
@@ -448,7 +474,8 @@
                         </p>
                         <p class="text-2xl leading-relaxed ${colors.secondary} font-medium">
                             A big THANKS again to <br>
-                            <span class="text-4xl font-bold ${colors.primary} mt-3 block font-sutra">
+                            <!-- UPDATED: Name to font-sans normal -->
+                            <span class="text-4xl ${colors.primary} mt-3 block font-sans">
                                 ${data.title} ${data.name}
                             </span>
                             <br>
