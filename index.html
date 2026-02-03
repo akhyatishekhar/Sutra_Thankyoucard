@@ -6,6 +6,7 @@
     <title>A Sutra - Thank You Card Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Poppins:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,600;1,600&family=Great+Vibes&family=Oswald:wght@500;700&family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet">
     <style>
@@ -19,8 +20,9 @@
         .hidden { display: none !important; }
 
         .card-container {
-            width: 210mm; /* A4 Width */
-            min-height: 297mm; /* A4 Height */
+            /* FIXED A4 DIMENSIONS - CRITICAL FOR DOWNLOAD QUALITY */
+            width: 794px; 
+            height: 1123px;
             background: white;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             margin: 0 auto;
@@ -28,6 +30,7 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            transform-origin: top center; /* Ensures scaling happens from the top */
         }
         
         /* Font Utilities */
@@ -72,25 +75,26 @@
             border: 1px solid rgba(0,0,0,0.05);
         }
 
-        /* Loading Overlay Style */
+        /* Loading Overlay Style - Fixed to cover screen on mobile */
         #loadingOverlay {
-            background: rgba(255, 255, 255, 0.9);
-            display: flex; align-items: center; justify-center;
-            z-index: 50;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex; 
+            flex-direction: column;
+            align-items: center; 
+            justify-center;
+            z-index: 9999;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
         }
 
-        /* Print Styles */
+        /* Print Styles - Hides UI when using Ctrl+P manually */
         @media print {
             body * { visibility: hidden; }
             #card-preview, #card-preview * { visibility: visible; }
             #card-preview {
                 position: absolute;
                 left: 0; top: 0;
-                width: 100%; height: 100%;
-                margin: 0;
-                box-shadow: none;
-                print-color-adjust: exact;
-                -webkit-print-color-adjust: exact;
+                transform: none !important;
             }
             .no-print { display: none; }
         }
@@ -98,10 +102,16 @@
 </head>
 <body class="p-4 md:p-8">
 
+    <!-- Global Loading Overlay -->
+    <div id="loadingOverlay" class="hidden">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600 mb-4"></div>
+        <span id="loadingText" class="text-pink-600 font-bold text-lg">Processing...</span>
+    </div>
+
     <div class="max-w-7xl mx-auto flex flex-col lg:flex-row gap-8">
         
         <!-- Controls Section -->
-        <div class="w-full lg:w-1/3 no-print">
+        <div class="w-full lg:w-1/3 no-print z-20">
             <div class="bg-white p-6 rounded-xl shadow-lg sticky top-8 max-h-[90vh] overflow-y-auto">
                 <h1 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-2">Card Generator</h1>
                 
@@ -192,11 +202,11 @@
 
                     <!-- Actions -->
                     <div class="pt-4 grid grid-cols-2 gap-3 border-t mt-4">
-                        <button onclick="downloadImage()" id="downloadBtn" class="bg-pink-600 text-white px-3 py-3 rounded-lg hover:bg-pink-700 transition shadow flex items-center justify-center gap-2 font-medium text-sm">
+                        <button onclick="downloadImage('jpg')" id="downloadBtn" class="bg-pink-600 text-white px-3 py-3 rounded-lg hover:bg-pink-700 transition shadow flex items-center justify-center gap-2 font-medium text-sm">
                             Download JPG
                         </button>
-                        <button onclick="window.print()" class="bg-gray-800 text-white px-3 py-3 rounded-lg hover:bg-black transition shadow flex items-center justify-center gap-2 font-medium text-sm">
-                            Save PDF
+                        <button onclick="savePDF()" id="pdfBtn" class="bg-gray-800 text-white px-3 py-3 rounded-lg hover:bg-black transition shadow flex items-center justify-center gap-2 font-medium text-sm">
+                            Download PDF
                         </button>
                     </div>
                      <p id="statusMsg" class="text-xs text-center text-gray-500 mt-2 h-4"></p>
@@ -205,14 +215,8 @@
         </div>
 
         <!-- Preview Section -->
-        <div class="w-full lg:w-2/3 flex justify-center bg-gray-200 p-4 lg:p-8 rounded-xl overflow-auto relative">
+        <div id="preview-wrapper" class="w-full lg:w-2/3 flex justify-center bg-gray-300 p-2 lg:p-8 rounded-xl overflow-hidden relative min-h-[500px]">
             
-            <!-- Loading Indicator: Forced hidden by inline style -->
-            <div id="loadingOverlay" class="absolute inset-0 bg-white/50 z-50 hidden rounded-xl" style="display: none;">
-                 <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600"></div>
-                 <span class="ml-2 text-pink-600 font-bold">Rendering...</span>
-            </div>
-
             <!-- The Card -->
             <div id="card-preview" class="card-container text-center text-gray-800">
                 
@@ -291,7 +295,8 @@
             date: document.getElementById('dateInput'),
             location: document.getElementById('locationInput'),
             logoUpload: document.getElementById('logoUpload'),
-            downloadBtn: document.getElementById('downloadBtn')
+            downloadBtn: document.getElementById('downloadBtn'),
+            pdfBtn: document.getElementById('pdfBtn')
         };
         const eventFields = document.getElementById('eventFields');
         const mainContent = document.getElementById('mainContent');
@@ -300,6 +305,9 @@
         const logoPlaceholder = document.getElementById('logoPlaceholder');
         const statusMsg = document.getElementById('statusMsg');
         const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const previewWrapper = document.getElementById('preview-wrapper');
+        const cardPreview = document.getElementById('card-preview');
 
         // Color Palette Definitions
         const palettes = {
@@ -484,43 +492,129 @@
             }
         }
 
-        // Image Download Logic
+        // --- NEW: Mobile Responsive Logic ---
+        function fitCardToScreen() {
+            if (!previewWrapper || !cardPreview) return;
+            
+            const wrapperWidth = previewWrapper.offsetWidth - 32; // -32px for padding
+            const cardWidth = 794; // Fixed A4 pixel width
+            
+            // Calculate scale: If screen is smaller than card, shrink it.
+            let scale = wrapperWidth / cardWidth;
+            
+            // Limit max scale to 1 (don't zoom in on huge screens)
+            if (scale > 1) scale = 1;
+            
+            // Apply scale
+            cardPreview.style.transform = `scale(${scale})`;
+            
+            // Adjust wrapper height so we don't have huge empty space below the shrunk card
+            // 1123 is fixed height. Add 50px buffer.
+            previewWrapper.style.height = `${(1123 * scale) + 50}px`;
+        }
+
+        // Image Download Logic (JPG)
         async function downloadImage() {
-            const card = document.getElementById('card-preview');
             const btn = document.getElementById('downloadBtn');
             const originalText = btn.innerText;
             
-            // Show Loader (Standard JS style toggle)
-            loadingOverlay.style.display = 'flex';
-            
+            // Show Loader
+            loadingOverlay.classList.remove('hidden');
+            loadingText.textContent = "Creating Image...";
             btn.innerText = "Processing...";
-            statusMsg.textContent = "Generating high-res image...";
 
             try {
-                await new Promise(r => setTimeout(r, 200)); // Let UI update
+                // 1. Reset Scale for Capture (Crucial for Full Quality)
+                const originalTransform = cardPreview.style.transform;
+                cardPreview.style.transform = 'none';
                 
-                const canvas = await html2canvas(card, {
-                    scale: 2,
+                // Wait a tick for DOM to update
+                await new Promise(r => setTimeout(r, 100));
+                
+                const canvas = await html2canvas(cardPreview, {
+                    scale: 2, // 2x Scale for crisp text
                     useCORS: true,
                     allowTaint: true,
                     backgroundColor: '#ffffff',
-                    logging: false
+                    logging: false,
+                    windowWidth: 794, // Force A4 width context
+                    windowHeight: 1123
                 });
+
+                // 2. Restore Scale for User View
+                cardPreview.style.transform = originalTransform;
 
                 const link = document.createElement('a');
                 link.download = `ThankYou_${controls.name.value.replace(/\s+/g, '')}.jpg`;
                 link.href = canvas.toDataURL('image/jpeg', 0.9);
                 link.click();
                 
-                statusMsg.textContent = "Done!";
             } catch (err) {
                 console.error(err);
-                alert("Error generating image. Please try 'Save PDF' instead.");
+                alert("Error generating image.");
+                fitCardToScreen();
             } finally {
                 // Hide Loader
-                loadingOverlay.style.display = 'none';
+                loadingOverlay.classList.add('hidden');
                 btn.innerText = originalText;
-                setTimeout(() => statusMsg.textContent = "", 3000);
+            }
+        }
+
+        // PDF Download Logic (New)
+        async function savePDF() {
+            const { jsPDF } = window.jspdf;
+            const btn = document.getElementById('pdfBtn');
+            const originalText = btn.innerText;
+
+            // Show Loader
+            loadingOverlay.classList.remove('hidden');
+            loadingText.textContent = "Creating PDF...";
+            btn.innerText = "Processing...";
+
+            try {
+                // 1. Reset Scale
+                const originalTransform = cardPreview.style.transform;
+                cardPreview.style.transform = 'none';
+                
+                // Wait for DOM
+                await new Promise(r => setTimeout(r, 100));
+
+                // 2. Capture Canvas (High Quality)
+                const canvas = await html2canvas(cardPreview, {
+                    scale: 2, // High res for PDF
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#ffffff',
+                    logging: false,
+                    windowWidth: 794,
+                    windowHeight: 1123
+                });
+
+                // 3. Create PDF
+                const imgData = canvas.toDataURL('image/jpeg', 1.0);
+                const pdf = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'mm',
+                    format: 'a4'
+                });
+
+                const imgProps = pdf.getImageProperties(imgData);
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                
+                pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                pdf.save(`ThankYou_${controls.name.value.replace(/\s+/g, '')}.pdf`);
+                
+                // 4. Restore Scale
+                cardPreview.style.transform = originalTransform;
+
+            } catch (err) {
+                console.error(err);
+                alert("Error generating PDF.");
+                fitCardToScreen();
+            } finally {
+                 loadingOverlay.classList.add('hidden');
+                 btn.innerText = originalText;
             }
         }
 
@@ -543,9 +637,14 @@
                 reader.readAsDataURL(file);
             }
         });
+        
+        // Window Resize Listener for Responsive Scaling
+        window.addEventListener('resize', fitCardToScreen);
 
         // Initialize
         renderCard();
+        // Delay scaling slightly to ensure DOM is ready
+        setTimeout(fitCardToScreen, 100);
 
     </script>
 </body>
